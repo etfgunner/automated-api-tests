@@ -1,0 +1,171 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/**
+      - pom.xml
+      - azure-pipelines.yml
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/**
+      - pom.xml
+      - azure-pipelines.yml
+
+variables:
+  # Build Configuration
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
+  
+  # Reporting
+  ALLURE_RESULTS_DIR: 'target/allure-results'
+  ALLURE_REPORT_DIR: 'target/allure-report'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+jobs:
+- job: ApiTests
+  displayName: 'Run API Tests'
+  timeoutInMinutes: 30
+  
+  steps:
+  # Setup Java Environment
+  - task: JavaToolInstaller@0
+    displayName: 'Setup Java 11'
+    inputs:
+      versionSpec: '11'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  # Cache Maven Dependencies
+  - task: Cache@2
+    displayName: 'Cache Maven Dependencies'
+    inputs:
+      key: 'maven | "$(Agent.OS)" | pom.xml'
+      restoreKeys: |
+        maven | "$(Agent.OS)"
+        maven
+      path: $(MAVEN_CACHE_FOLDER)
+
+  # Display Build Information
+  - script: |
+      echo "Pipeline: $(Build.DefinitionName)"
+      echo "Build ID: $(Build.BuildId)"
+      echo "Source Branch: $(Build.SourceBranch)"
+      echo "Agent OS: $(Agent.OS)"
+      echo "Java Version:"
+      java -version
+      echo "Maven Version:"
+      mvn -version
+    displayName: 'Display Build Information'
+
+  # Compile Test Code
+  - task: Maven@3
+    displayName: 'Compile Test Code'
+    inputs:
+      mavenPomFile: 'pom.xml'
+      goals: 'test-compile'
+      options: '$(MAVEN_OPTS)'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.11'
+
+  # Create Test Results Directory
+  - script: |
+      mkdir -p target/surefire-reports
+      mkdir -p $(ALLURE_RESULTS_DIR)
+      mkdir -p $(ALLURE_REPORT_DIR)
+      mkdir -p target/logs
+    displayName: 'Create Test Directories'
+
+  # Run API Tests
+  - task: Maven@3
+    displayName: 'Execute API Tests'
+    inputs:
+      mavenPomFile: 'pom.xml'
+      goals: 'clean test'
+      options: |
+        $(MAVEN_OPTS)
+        -Dlogging.enabled=true
+        -Dmaven.test.failure.ignore=true
+        -Dallure.results.directory=$(ALLURE_RESULTS_DIR)
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.11'
+    continueOnError: true
+
+  # Install Allure CLI
+  - script: |
+      curl -o allure-commandline.zip -Ls https://github.com/allure-framework/allure2/releases/download/2.25.0/allure-2.25.0.zip
+      unzip allure-commandline.zip -d $(Agent.TempDirectory)
+      sudo ln -s $(Agent.TempDirectory)/allure-2.25.0/bin/allure /usr/local/bin/allure
+      allure --version
+    displayName: 'Install Allure CLI'
+
+  # Generate Allure Report
+  - script: |
+      if [ -d "$(ALLURE_RESULTS_DIR)" ] && [ "$(ls -A $(ALLURE_RESULTS_DIR))" ]; then
+        allure generate $(ALLURE_RESULTS_DIR) --output $(ALLURE_REPORT_DIR) --clean
+        echo "Allure report generated successfully"
+      else
+        echo "No Allure results found to generate report"
+      fi
+    displayName: 'Generate Allure Report'
+    continueOnError: true
+
+  # Publish Test Results
+  - task: PublishTestResults@2
+    displayName: 'Publish TestNG Results'
+    condition: always()
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: |
+        **/target/surefire-reports/*.xml
+        **/target/surefire-reports/TEST-*.xml
+      searchFolder: '$(System.DefaultWorkingDirectory)'
+      mergeTestResults: true
+      failTaskOnFailedTests: false
+      testRunTitle: 'API Tests'
+      buildConfiguration: 'Default'
+      buildPlatform: 'Java'
+
+  # Publish Allure Report as Artifact
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Allure Report'
+    condition: always()
+    inputs:
+      PathtoPublish: '$(ALLURE_REPORT_DIR)'
+      ArtifactName: 'allure-report-$(Build.BuildId)'
+      publishLocation: 'Container'
+
+  # Publish Test Logs
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Test Logs'
+    condition: always()
+    inputs:
+      PathtoPublish: 'target/logs'
+      ArtifactName: 'test-logs-$(Build.BuildId)'
+      publishLocation: 'Container'
+
+  # Publish Surefire Reports
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Surefire Reports'
+    condition: always()
+    inputs:
+      PathtoPublish: 'target/surefire-reports'
+      ArtifactName: 'surefire-reports-$(Build.BuildId)'
+      publishLocation: 'Container'
+
+  # Archive Allure Results for History
+  - task: PublishBuildArtifacts@1
+    displayName: 'Archive Allure Results'
+    condition: always()
+    inputs:
+      PathtoPublish: '$(ALLURE_RESULTS_DIR)'
+      ArtifactName: 'allure-results-$(Build.BuildId)'
+      publishLocation: 'Container'

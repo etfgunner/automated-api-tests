@@ -1,0 +1,20 @@
+{
+  "pageCountValidation": [
+    {
+      "pageCount": 100,
+      "shouldBeValid": true,
+      "description": "100 pages should be valid"
+    },
+    {
+      "pageCount": -1,
+      "shouldBeValid": false,
+      "description": "Negative pages should be invalid"
+    }
+  ],
+  "bookSearchTerms": [
+    {
+      "searchTerm": "fiction",
+      "description": "Fiction books should be returned"
+    }
+  ]
+}

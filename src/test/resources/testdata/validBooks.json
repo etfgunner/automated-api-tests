@@ -1,0 +1,18 @@
+[
+  {
+    "id": 0,
+    "title": "Test Book 1",
+    "description": "Test description",
+    "pageCount": 200,
+    "excerpt": "Test excerpt",
+    "publishDate": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 0,
+    "title": "Test Book 2", 
+    "description": "Another test book",
+    "pageCount": 300,
+    "excerpt": "Another test excerpt",
+    "publishDate": "2024-01-02T00:00:00Z"
+  }
+]

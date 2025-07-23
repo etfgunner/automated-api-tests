@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Books API Test Suite" parallel="none" thread-count="1">
+
+    <test name="All API Tests">
+        <classes>
+            <class name="com.api.tests.BooksApiTest"/>
+            <class name="com.api.tests.AuthorsApiTest"/>
+        </classes>
+    </test>
+    
+</suite>

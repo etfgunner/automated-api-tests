@@ -1,0 +1,10 @@
+{
+  "validBookIds": [1, 2],
+  "validAuthorIds": [1, 2],
+  "invalidIds": [
+    {
+      "id": -1,
+      "description": "Negative ID"
+    }
+  ]
+}

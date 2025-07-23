@@ -1,0 +1,11 @@
+[
+  {
+    "testData": {
+      "id": 0,
+      "idBook": 1,
+      "firstName": "",
+      "lastName": "ValidLastName"
+    },
+    "expectedError": "Empty first name should be rejected"
+  }
+]
