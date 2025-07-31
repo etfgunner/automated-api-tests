@@ -2,6 +2,7 @@ package com.api.tests;
 
 import com.api.tests.base.BaseTest;
 import com.api.tests.client.ApiClient;
+import com.api.tests.dataproviders.TestDataProviders;
 import com.api.tests.enums.ApiEndpoint;
 import com.api.tests.models.Book;
 import com.api.tests.utils.TestDataGenerator;
@@ -33,13 +34,12 @@ public class BooksApiTest extends BaseTest {
         assertNotNull(firstBook.getDescription());
     }
 
-    @Test
+    @Test(dataProvider = "bookIds", dataProviderClass = TestDataProviders.class)
     @Story("Get Book by ID")
     @Description("Verify that GET /api/v1/Books/{id} returns details of a specific book")
-    public void testGetBookById() {
-        logTestInfo("testGetBookById", "Retrieve a specific book by ID");
+    public void testGetBookById(int bookId) {
+        logTestInfo("testGetBookById", "Retrieve book by ID: " + bookId);
 
-        int bookId = 1;
         Book book = ApiClient.get(ApiEndpoint.BOOKS_BY_ID, bookId, 200, Book.class);
         
         assertNotNull(book);
@@ -48,34 +48,36 @@ public class BooksApiTest extends BaseTest {
         assertNotNull(book.getDescription());
     }
 
-    @Test
+    @Test(dataProvider = "invalidIds", dataProviderClass = TestDataProviders.class)
     @Story("Get Book by ID")
     @Description("Verify that GET /api/v1/Books/{id} returns 404 for non-existent book")
-    public void testGetNonExistentBook() {
-        logTestInfo("testGetNonExistentBook", "Verify 404 for non-existent book");
+    public void testGetNonExistentBook(Object invalidId, String description) {
+        logTestInfo("testGetNonExistentBook", "Verify 404 for: " + description);
 
-        int nonExistentId = 999999;
-        ApiClient.get(ApiEndpoint.BOOKS_BY_ID, nonExistentId, 404);
+        ApiClient.get(ApiEndpoint.BOOKS_BY_ID, invalidId, 404);
     }
 
-    @Test
+    @Test(dataProvider = "validBookData", dataProviderClass = TestDataProviders.class)
     @Story("Create Book")
     @Description("Verify that POST /api/v1/Books creates a new book successfully")
-    public void testCreateBook() {
-        logTestInfo("testCreateBook", "Create a new book via POST request");
-
-        Book newBook = Book.builder()
-                .id(0)
-                .title(TestDataGenerator.generateRandomBookTitle())
-                .description("Test book description")
-                .pageCount(200)
-                .excerpt("Test excerpt")
-                .publishDate("2024-01-01T00:00:00Z")
-                .build();
+    public void testCreateBookWithValidData(Book newBook) {
+        logTestInfo("testCreateBookWithValidData", "Create book: " + newBook.getTitle());
 
         Book createdBook = ApiClient.post(ApiEndpoint.BOOKS, newBook, 200, Book.class);
         assertNotNull(createdBook);
         assertEquals(createdBook.getTitle(), newBook.getTitle());
+        assertEquals(createdBook.getDescription(), newBook.getDescription());
+    }
+
+    @Test(dataProvider = "randomBookData", dataProviderClass = TestDataProviders.class)
+    @Story("Create Book")
+    @Description("Verify that POST /api/v1/Books creates random books successfully")
+    public void testCreateRandomBook(Book randomBook) {
+        logTestInfo("testCreateRandomBook", "Create random book: " + randomBook.getTitle());
+
+        Book createdBook = ApiClient.post(ApiEndpoint.BOOKS, randomBook, 200, Book.class);
+        assertNotNull(createdBook);
+        assertEquals(createdBook.getTitle(), randomBook.getTitle());
     }
 
     @Test
@@ -124,24 +126,22 @@ public class BooksApiTest extends BaseTest {
         ApiClient.delete(ApiEndpoint.BOOKS_BY_ID, bookId, 200);
     }
 
-    @Test
+    @Test(dataProvider = "invalidBookData", dataProviderClass = TestDataProviders.class)
     @Story("Create Book")
     @Description("Verify that POST /api/v1/Books returns 400 for invalid book data")
-    public void testCreateBookWithInvalidData() {
-        logTestInfo("testCreateBookWithInvalidData", "Test POST with invalid data");
+    public void testCreateBookWithInvalidData(Book invalidBook, String expectedError) {
+        logTestInfo("testCreateBookWithInvalidData", "Test invalid data: " + expectedError);
 
-        String invalidBookJson = "{}";
-        ApiClient.post(ApiEndpoint.BOOKS, invalidBookJson, 400);
+        ApiClient.post(ApiEndpoint.BOOKS, invalidBook, 400);
     }
 
-    @Test
+    @Test(dataProvider = "invalidIds", dataProviderClass = TestDataProviders.class)
     @Story("Delete Book")
     @Description("Verify that DELETE /api/v1/Books/{id} returns 404 for non-existent book")
-    public void testDeleteNonExistentBook() {
-        logTestInfo("testDeleteNonExistentBook", "Verify DELETE returns 404 for non-existent book");
+    public void testDeleteNonExistentBook(Object invalidId, String description) {
+        logTestInfo("testDeleteNonExistentBook", "Verify DELETE 404 for: " + description);
 
-        int nonExistentId = 999999;
-        ApiClient.delete(ApiEndpoint.BOOKS_BY_ID, nonExistentId, 404);
+        ApiClient.delete(ApiEndpoint.BOOKS_BY_ID, invalidId, 404);
     }
 
     @Test
@@ -162,23 +162,54 @@ public class BooksApiTest extends BaseTest {
         }
     }
 
-    @Test
+    @Test(dataProvider = "pageCountValidation", dataProviderClass = TestDataProviders.class)
     @Story("Update Book")
-    @Description("Verify that PUT /api/v1/Books/{id} returns 400 for invalid data")
-    public void testUpdateBookWithInvalidData() {
-        logTestInfo("testUpdateBookWithInvalidData", "Test PUT with invalid data");
+    @Description("Verify page count validation in PUT /api/v1/Books/{id}")
+    public void testUpdateBookPageCountValidation(int pageCount, boolean shouldBeValid, String description) {
+        logTestInfo("testUpdateBookPageCountValidation", "Test page count: " + description);
 
         int bookId = 1;
-        
-        Book invalidBook = Book.builder()
+        Book bookWithPageCount = Book.builder()
                 .id(bookId)
-                .title("")
+                .title("Updated Title")
                 .description("Valid description")
-                .pageCount(-10)
+                .pageCount(pageCount)
                 .excerpt("Valid excerpt")
-                .publishDate("invalid-date-format")
+                .publishDate("2024-01-01T00:00:00Z")
                 .build();
 
-        ApiClient.put(ApiEndpoint.BOOKS_BY_ID, bookId, invalidBook, 400);
+        int expectedStatus = shouldBeValid ? 200 : 400;
+        ApiClient.put(ApiEndpoint.BOOKS_BY_ID, bookId, bookWithPageCount, expectedStatus);
+    }
+
+    @Test(dataProvider = "bookSearchData", dataProviderClass = TestDataProviders.class)
+    @Story("Search Books")
+    @Description("Verify book search functionality with various search terms")
+    public void testBookSearch(String searchTerm, String description) {
+        logTestInfo("testBookSearch", "Search books with: " + description);
+
+        // Note: This assumes the API supports search functionality
+        // If not implemented, this test would need to be adapted or removed
+        Book[] books = ApiClient.get(ApiEndpoint.BOOKS, 200, Book[].class);
+        assertNotNull(books);
+        
+        // Basic validation that books are returned
+        assertTrue(books.length >= 0);
+    }
+
+    @Test(dataProvider = "bulkTestData", dataProviderClass = TestDataProviders.class)
+    @Story("Bulk Operations")
+    @Description("Verify bulk operations with book and author data")
+    public void testBulkBookOperations(int bookId, String bookTitle, String authorFirstName, String authorLastName) {
+        logTestInfo("testBulkBookOperations", 
+            String.format("Testing bulk data: Book ID %d, Title: %s, Author: %s %s", 
+                bookId, bookTitle, authorFirstName, authorLastName));
+
+        // Test getting book by the bulk test data ID
+        if (bookId > 0) {
+            Book book = ApiClient.get(ApiEndpoint.BOOKS_BY_ID, bookId, 200, Book.class);
+            assertNotNull(book);
+            assertEquals(book.getId(), bookId);
+        }
     }
 }

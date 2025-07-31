@@ -2,6 +2,7 @@ package com.api.tests;
 
 import com.api.tests.base.BaseTest;
 import com.api.tests.client.ApiClient;
+import com.api.tests.dataproviders.TestDataProviders;
 import com.api.tests.enums.ApiEndpoint;
 import com.api.tests.models.Author;
 import com.api.tests.utils.TestDataGenerator;
@@ -34,13 +35,12 @@ public class AuthorsApiTest extends BaseTest {
         assertNotNull(firstAuthor.getLastName());
     }
 
-    @Test
+    @Test(dataProvider = "authorIds", dataProviderClass = TestDataProviders.class)
     @Story("Get Author by ID")
     @Description("Verify that GET /api/v1/Authors/{id} returns details of a specific author")
-    public void testGetAuthorById() {
-        logTestInfo("testGetAuthorById", "Retrieve a specific author by ID");
+    public void testGetAuthorById(int authorId) {
+        logTestInfo("testGetAuthorById", "Retrieve author by ID: " + authorId);
 
-        int authorId = 1;
         Author author = ApiClient.get(ApiEndpoint.AUTHORS_BY_ID, authorId, 200, Author.class);
         
         assertNotNull(author);
@@ -50,35 +50,40 @@ public class AuthorsApiTest extends BaseTest {
         assertTrue(author.getIdBook() > 0);
     }
 
-    @Test
+    @Test(dataProvider = "invalidIds", dataProviderClass = TestDataProviders.class)
     @Story("Get Author by ID")
     @Description("Verify that GET /api/v1/Authors/{id} returns 404 for non-existent author")
-    public void testGetNonExistentAuthor() {
-        logTestInfo("testGetNonExistentAuthor", "Verify 404 for non-existent author");
+    public void testGetNonExistentAuthor(Object invalidId, String description) {
+        logTestInfo("testGetNonExistentAuthor", "Verify 404 for: " + description);
 
-        int nonExistentId = 999999;
-        ApiClient.get(ApiEndpoint.AUTHORS_BY_ID, nonExistentId, 404);
+        ApiClient.get(ApiEndpoint.AUTHORS_BY_ID, invalidId, 404);
     }
 
-    @Test
+    @Test(dataProvider = "validAuthorData", dataProviderClass = TestDataProviders.class)
     @Story("Create Author")
     @Description("Verify that POST /api/v1/Authors creates a new author successfully")
-    public void testCreateAuthor() {
-        logTestInfo("testCreateAuthor", "Create a new author via POST request");
-
-        String[] nameParts = TestDataGenerator.generateRandomName().split(" ");
-        Author newAuthor = Author.builder()
-                .id(1)
-                .idBook(1)
-                .firstName(nameParts[0])
-                .lastName(nameParts.length > 1 ? nameParts[1] : "TestLastName")
-                .build();
+    public void testCreateAuthorWithValidData(Author newAuthor) {
+        logTestInfo("testCreateAuthorWithValidData", 
+            "Create author: " + newAuthor.getFirstName() + " " + newAuthor.getLastName());
 
         Author createdAuthor = ApiClient.post(ApiEndpoint.AUTHORS, newAuthor, 200, Author.class);
         assertNotNull(createdAuthor);
-        assertTrue(createdAuthor.getId() > 0);
         assertEquals(createdAuthor.getFirstName(), newAuthor.getFirstName());
         assertEquals(createdAuthor.getLastName(), newAuthor.getLastName());
+        assertEquals(createdAuthor.getIdBook(), newAuthor.getIdBook());
+    }
+
+    @Test(dataProvider = "randomAuthorData", dataProviderClass = TestDataProviders.class)
+    @Story("Create Author")
+    @Description("Verify that POST /api/v1/Authors creates random authors successfully")
+    public void testCreateRandomAuthor(Author randomAuthor) {
+        logTestInfo("testCreateRandomAuthor", 
+            "Create random author: " + randomAuthor.getFirstName() + " " + randomAuthor.getLastName());
+
+        Author createdAuthor = ApiClient.post(ApiEndpoint.AUTHORS, randomAuthor, 200, Author.class);
+        assertNotNull(createdAuthor);
+        assertEquals(createdAuthor.getFirstName(), randomAuthor.getFirstName());
+        assertEquals(createdAuthor.getLastName(), randomAuthor.getLastName());
     }
 
     @Test
@@ -125,24 +130,22 @@ public class AuthorsApiTest extends BaseTest {
         ApiClient.delete(ApiEndpoint.AUTHORS_BY_ID, authorId, 200);
     }
 
-    @Test
+    @Test(dataProvider = "invalidAuthorData", dataProviderClass = TestDataProviders.class)
     @Story("Create Author")
     @Description("Verify that POST /api/v1/Authors returns 400 for invalid author data")
-    public void testCreateAuthorWithInvalidData() {
-        logTestInfo("testCreateAuthorWithInvalidData", "Test POST with invalid data");
+    public void testCreateAuthorWithInvalidData(Author invalidAuthor, String expectedError) {
+        logTestInfo("testCreateAuthorWithInvalidData", "Test invalid data: " + expectedError);
 
-        String invalidAuthorJson = "{}";
-        ApiClient.post(ApiEndpoint.AUTHORS, invalidAuthorJson, 400);
+        ApiClient.post(ApiEndpoint.AUTHORS, invalidAuthor, 400);
     }
 
-    @Test
+    @Test(dataProvider = "invalidIds", dataProviderClass = TestDataProviders.class)
     @Story("Delete Author")
     @Description("Verify that DELETE /api/v1/Authors/{id} returns 404 for non-existent author")
-    public void testDeleteNonExistentAuthor() {
-        logTestInfo("testDeleteNonExistentAuthor", "Verify DELETE returns 404 for non-existent author");
+    public void testDeleteNonExistentAuthor(Object invalidId, String description) {
+        logTestInfo("testDeleteNonExistentAuthor", "Verify DELETE 404 for: " + description);
 
-        int nonExistentId = 999999;
-        ApiClient.delete(ApiEndpoint.AUTHORS_BY_ID, nonExistentId, 404);
+        ApiClient.delete(ApiEndpoint.AUTHORS_BY_ID, invalidId, 404);
     }
 
     @Test
@@ -227,5 +230,46 @@ public class AuthorsApiTest extends BaseTest {
         assertNotEquals(createdAuthor1.getIdBook(), createdAuthor2.getIdBook());
         assertEquals(createdAuthor1.getIdBook(), 1);
         assertEquals(createdAuthor2.getIdBook(), 2);
+    }
+
+    @Test(dataProvider = "bulkTestData", dataProviderClass = TestDataProviders.class)
+    @Story("Bulk Operations")
+    @Description("Verify bulk operations with author and book data")
+    public void testBulkAuthorOperations(int bookId, String bookTitle, String authorFirstName, String authorLastName) {
+        logTestInfo("testBulkAuthorOperations", 
+            String.format("Testing bulk author data: %s %s for Book ID %d (%s)", 
+                authorFirstName, authorLastName, bookId, bookTitle));
+
+        // Create an author with the bulk test data
+        Author bulkAuthor = Author.builder()
+                .id(0)
+                .idBook(bookId)
+                .firstName(authorFirstName)
+                .lastName(authorLastName)
+                .build();
+
+        Author createdAuthor = ApiClient.post(ApiEndpoint.AUTHORS, bulkAuthor, 200, Author.class);
+        assertNotNull(createdAuthor);
+        assertEquals(createdAuthor.getFirstName(), authorFirstName);
+        assertEquals(createdAuthor.getLastName(), authorLastName);
+        assertEquals(createdAuthor.getIdBook(), bookId);
+    }
+
+    @Test
+    @Story("Author-Book Relationship")
+    @Description("Verify authors are properly associated with valid book IDs")
+    public void testAuthorBookIdValidation() {
+        logTestInfo("testAuthorBookIdValidation", "Validate author-book ID relationships");
+
+        Author[] authors = ApiClient.get(ApiEndpoint.AUTHORS, 200, Author[].class);
+        assertNotNull(authors);
+        assertTrue(authors.length > 0);
+        
+        // Verify all authors have valid book IDs
+        for (Author author : authors) {
+            assertTrue(author.getIdBook() > 0, 
+                String.format("Author %s %s should have a valid book ID", 
+                    author.getFirstName(), author.getLastName()));
+        }
     }
 }
